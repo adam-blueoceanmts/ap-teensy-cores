@@ -61,7 +61,7 @@ private:
 	// openNextFile() while traversing a directory.
 	// Only the abstract File class which references these derived
 	// classes is meant to have a public constructor!
-	SDFile(const SDFAT_FILE &file) : sdfatfile(file), filename(nullptr) { }
+        SDFile(const SDFAT_FILE &file) : sdfatfile(file), filename(nullptr), filename_alloc(false) { }
 	friend class SDClass;
 public:
 	virtual ~SDFile(void) {
@@ -97,30 +97,33 @@ public:
 	virtual uint64_t size() {
 		return sdfatfile.size();
 	}
-	virtual void close() {
-		if (filename) {
-			free(filename);
-			filename = nullptr;
-		}
-		if (sdfatfile.isOpen()) {
-			sdfatfile.close();
-		}
-	}
+        virtual void close() {
+                if (filename_alloc && filename) {
+                        free(filename);
+                }
+                filename = nullptr;
+                filename_alloc = false;
+                if (sdfatfile.isOpen()) {
+                        sdfatfile.close();
+                }
+        }
 	virtual bool isOpen() {
 		return sdfatfile.isOpen();
 	}
-	virtual const char * name() {
-		if (!filename) {
-			filename = (char *)malloc(MAX_FILENAME_LEN);
-			if (filename) {
-				sdfatfile.getName(filename, MAX_FILENAME_LEN);
-			} else {
-				static char zeroterm = 0;
-				filename = &zeroterm;
-			}
-		}
-		return filename;
-	}
+        virtual const char * name() {
+                if (!filename) {
+                        filename = (char *)malloc(MAX_FILENAME_LEN);
+                        if (filename) {
+                                sdfatfile.getName(filename, MAX_FILENAME_LEN);
+                                filename_alloc = true;
+                        } else {
+                                static char zeroterm = 0;
+                                filename = &zeroterm;
+                                filename_alloc = false;
+                        }
+                }
+                return filename;
+        }
 	virtual boolean isDirectory(void) {
 		return sdfatfile.isDirectory();
 	}
@@ -167,8 +170,9 @@ public:
 			tm.mday, tm.hour, tm.min, tm.sec);
 	}
 private:
-	SDFAT_FILE sdfatfile;
-	char *filename;
+        SDFAT_FILE sdfatfile;
+        char *filename;
+        bool filename_alloc;
 };
 
 

@@ -2685,12 +2685,14 @@ private:
     // openNextFile() while traversing a directory.
     // Only the abstract File class which references these derived
     // classes is meant to have a public constructor!
-    MSCFile(const FsFile &file) : mscfatfile(file), filename(nullptr) { }
+    MSCFile(const FsFile &file) : mscfatfile(file), filename(nullptr), filename_alloc(false) { }
     friend class USBFilesystem;
 public:
     virtual ~MSCFile(void) {
         if (mscfatfile) mscfatfile.close();
-        if (filename) free(filename);
+        if (filename_alloc && filename) free(filename);
+        filename = nullptr;
+        filename_alloc = false;
     }
 #ifdef FILE_WHOAMI
     virtual void whoami() {
@@ -2729,10 +2731,11 @@ public:
         return mscfatfile.size();
     }
     virtual void close() {
-        if (filename) {
+        if (filename_alloc && filename) {
             free(filename);
-            filename = nullptr;
         }
+        filename = nullptr;
+        filename_alloc = false;
         mscfatfile.close();
     }
     virtual bool isOpen() {
@@ -2743,9 +2746,11 @@ public:
             filename = (char *)malloc(MSC_MAX_FILENAME_LEN);
             if (filename) {
                 mscfatfile.getName(filename, MSC_MAX_FILENAME_LEN);
+                filename_alloc = true;
             } else {
                 static char zeroterm = 0;
                 filename = &zeroterm;
+                filename_alloc = false;
             }
         }
         return filename;
@@ -2799,6 +2804,7 @@ public:
 private:
     FsFile mscfatfile;
     char *filename;
+    bool filename_alloc;
 };
 
 class USBFilesystem : public USBFSBase
